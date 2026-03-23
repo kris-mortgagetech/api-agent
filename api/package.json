@@ -1,0 +1,17 @@
+{
+  "name": "alt-plus-eligibility-api",
+  "version": "1.0.0",
+  "description": "Alt Plus Loan Eligibility — Azure Functions API (SWA)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "func start",
+    "test": "node --test src/**/*.test.js"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0",
+    "pdfjs-dist": "^4.9.155"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
