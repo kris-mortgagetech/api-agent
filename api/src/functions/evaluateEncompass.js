@@ -22,10 +22,22 @@ const { EligibilityAgent } = require('../services/eligibilityAgent');
  *   "pdfBase64": "..."
  * }
  */
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age':       '86400',
+};
+
 app.http('evaluate-encompass', {
-  methods:   ['POST'],
+  methods:   ['POST', 'OPTIONS'],
   authLevel: 'anonymous',
   handler:   async (request, context) => {
+
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+      return { status: 204, headers: CORS_HEADERS, body: '' };
+    }
 
     context.log('evaluate-encompass: request received');
 
@@ -85,9 +97,9 @@ app.http('evaluate-encompass', {
 });
 
 function ok(data) {
-  return { status: 200, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) };
+  return { status: 200, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }, body: JSON.stringify(data) };
 }
 function err(status, message) {
-  return { status, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: message }) };
+  return { status, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }, body: JSON.stringify({ error: message }) };
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

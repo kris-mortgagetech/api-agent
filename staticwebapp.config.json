@@ -2,7 +2,8 @@
   "routes": [
     {
       "route": "/api/*",
-      "allowedRoles": ["anonymous"]
+      "allowedRoles": ["anonymous"],
+      "methods": ["GET", "POST", "OPTIONS"]
     },
     {
       "route": "/*",
@@ -14,6 +15,10 @@
     "exclude": ["/api/*", "/*.{css,js,png,jpg,ico,pdf,json}"]
   },
   "globalHeaders": {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "86400",
     "content-security-policy": "default-src 'self' https: 'unsafe-eval' 'unsafe-inline'; connect-src 'self' http://localhost:* https:; object-src 'none'"
   },
   "mimeTypes": {
