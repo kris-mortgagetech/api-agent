@@ -102,11 +102,13 @@
       display: flex;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+      flex-wrap: wrap;
     }
     .tab {
       flex: 1;
-      padding: .75rem 1rem;
-      font-size: .78rem;
+      min-width: 0;
+      padding: .65rem .6rem;
+      font-size: .72rem;
       font-weight: 500;
       letter-spacing: .04em;
       text-transform: uppercase;
@@ -479,9 +481,9 @@
 
   <!-- ── Header ─────────────────────────────────────────────── -->
   <header>
-    <div class="wordmark">Alt<span>Plus</span></div>
+    <div class="wordmark">Loan<span>Check</span></div>
     <div class="divider"></div>
-    <div class="subtitle">Loan Eligibility Checker</div>
+    <div class="subtitle">Mortgage Eligibility Checker</div>
     <div class="spacer"></div>
     <div class="provider-badge" id="providerBadge">loading provider…</div>
   </header>
@@ -494,6 +496,7 @@
       <!-- Tabs -->
       <div class="tabs">
         <button class="tab active" data-tab="single">Single Loan</button>
+        <button class="tab" data-tab="encompass">Encompass JSON</button>
         <button class="tab" data-tab="batch">Batch / JSON</button>
       </div>
 
@@ -518,7 +521,7 @@
             </div>
             <div class="field">
               <label>Program</label>
-              <input type="text" id="f-loanProgram" placeholder="Alt Plus 30" />
+              <input type="text" id="f-loanProgram" placeholder="e.g. FNMA Standard, Alt Plus 30" />
             </div>
           </div>
           <div class="field-row">
@@ -531,6 +534,7 @@
               <select id="f-loanPurpose">
                 <option value="">— Select —</option>
                 <option>Purchase</option>
+                <option>Limited Cash-Out Refinance</option>
                 <option>NoCash-Out Refinance</option>
                 <option>Cash-Out Refinance</option>
               </select>
@@ -542,8 +546,11 @@
               <select id="f-occupancyStatus">
                 <option value="">— Select —</option>
                 <option>PrimaryResidence</option>
+                <option>Principal Residence</option>
                 <option>SecondHome</option>
+                <option>Second Home</option>
                 <option>Investor</option>
+                <option>Investment Property</option>
               </select>
             </div>
             <div class="field">
@@ -579,12 +586,69 @@
             </div>
           </div>
           <div class="field">
-            <label>Credit Event</label>
-            <input type="text" id="f-creditEvent" placeholder="N/A  or  BK discharged 60 months ago" />
+            <label>Credit Event <span style="font-weight:400;color:var(--ink-4)">(summary — auto-built from fields below)</span></label>
+            <input type="text" id="f-creditEvent" placeholder="N/A  or  BK Ch.7 Discharged 2023-01-15; Foreclosure 2022-08-20" />
           </div>
           <div class="field">
             <label>Housing / Payment History</label>
             <input type="text" id="f-housingHistory" placeholder="0x30x12" />
+          </div>
+          <!-- Derogatory credit detail fields -->
+          <div class="field-row">
+            <div class="field">
+              <label>Bankruptcy?</label>
+              <select id="f-bankruptcyIndicator">
+                <option value="">— Unknown —</option>
+                <option value="N">No</option>
+                <option value="Y">Yes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Bankruptcy Chapter</label>
+              <select id="f-bankruptcyType">
+                <option value="">— N/A —</option>
+                <option value="7">Chapter 7</option>
+                <option value="11">Chapter 11</option>
+                <option value="13">Chapter 13</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Bankruptcy Status</label>
+              <select id="f-bankruptcyStatus">
+                <option value="">— N/A —</option>
+                <option value="Discharged">Discharged</option>
+                <option value="Dismissed">Dismissed</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Bankruptcy Date</label>
+              <input type="date" id="f-bankruptcyDate" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Foreclosure (past 7 yrs)?</label>
+              <select id="f-foreclosureIndicator">
+                <option value="">— Unknown —</option>
+                <option value="N">No</option>
+                <option value="Y">Yes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Foreclosure Date</label>
+              <input type="date" id="f-foreclosureDate" />
+            </div>
+          </div>
+          <!-- Self-employed -->
+          <div class="field">
+            <label>Self-Employed?</label>
+            <select id="f-selfEmployed">
+              <option value="">— Unknown —</option>
+              <option value="N">No</option>
+              <option value="Y">Yes</option>
+            </select>
           </div>
         </div>
 
@@ -601,6 +665,7 @@
                 <option>Condo</option>
                 <option>2-4 Unit</option>
                 <option>Manufactured Home</option>
+                <option>MH Advantage</option>
                 <option>Condotel</option>
               </select>
             </div>
@@ -654,6 +719,16 @@
             <div class="field">
               <label>CLTV (%)</label>
               <input type="number" id="f-cltv" placeholder="80.000" step="0.001" />
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>HCLTV (%)</label>
+              <input type="number" id="f-hcltv" placeholder="80.000" step="0.001" />
+            </div>
+            <div class="field">
+              <label>Reserves (months)</label>
+              <input type="number" id="f-reservesMonths" placeholder="0" min="0" />
             </div>
           </div>
           <div class="field-row">
@@ -731,6 +806,50 @@
         </div>
 
       </div><!-- /tab-single -->
+
+      <!-- Encompass JSON Tab -->
+      <div class="tab-content" id="tab-encompass">
+
+        <!-- PDF Upload (shared) -->
+        <div class="pdf-zone" id="pdfZoneEncompass" onclick="document.getElementById('pdfFileEncompass').click()">
+          <input type="file" id="pdfFileEncompass" accept=".pdf" />
+          <div class="icon">📄</div>
+          <div class="label" id="pdfLabelEncompass">Upload Guidelines PDF</div>
+          <div class="sublabel">Same PDF as other tabs — shared</div>
+        </div>
+
+        <div class="section-title">Paste Encompass Loan JSON</div>
+        <div class="field-group">
+          <div class="field">
+            <label style="display:flex;align-items:center;justify-content:space-between">
+              <span>Encompass Loan JSON</span>
+              <button onclick="pasteEncompassSample()" style="font-size:.68rem;padding:.2rem .5rem;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;color:var(--ink-3)">Paste Sample</button>
+            </label>
+            <textarea id="encompassJson"
+              placeholder='Paste raw Encompass v3 loan JSON here — single loan object { ... } or array [ {...}, {...} ]'
+              style="font-family:var(--font-mono);font-size:.7rem;height:240px;resize:vertical;width:100%;padding:.6rem;border:1px solid var(--border);border-radius:var(--radius);background:#fafafa;line-height:1.5;box-sizing:border-box"
+              oninput="onEncompassJsonChange()"
+            ></textarea>
+          </div>
+          <div id="encompassJsonStatus" style="font-size:.72rem;margin-top:.25rem;display:none"></div>
+        </div>
+
+        <div style="font-size:.74rem;color:var(--ink-3);line-height:1.7;padding:.5rem 0 0">
+          <strong>Supported formats:</strong><br/>
+          Single loan: &nbsp;<code style="font-family:var(--font-mono)">{ "loanNumber": "...", "loanAmount": 650000, ... }</code><br/>
+          Array: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code style="font-family:var(--font-mono)">[ { ... }, { ... } ]</code><br/>
+          <br/>
+          <strong>Key fields mapped automatically from Encompass v3 JSON:</strong><br/>
+          <code style="font-family:var(--font-mono)">lTV, cltV, hcltV</code> → LTV/CLTV/HCLTV &nbsp;|&nbsp;
+          <code style="font-family:var(--font-mono)">applications[0].borrower.middleCreditScore</code> → FICO<br/>
+          <code style="font-family:var(--font-mono)">applications[0].bottomRatioPercent</code> → DTI &nbsp;|&nbsp;
+          <code style="font-family:var(--font-mono)">propertyUsageType</code> → Occupancy<br/>
+          <code style="font-family:var(--font-mono)">gsePropertyType</code> → Property Type &nbsp;|&nbsp;
+          <code style="font-family:var(--font-mono)">riskAssessmentType</code> → DU/Manual<br/>
+          Custom fields (<code style="font-family:var(--font-mono)">CX.*</code>) are also scanned for non-QM data.
+        </div>
+
+      </div><!-- /tab-encompass -->
 
       <!-- Batch / JSON Tab -->
       <div class="tab-content" id="tab-batch">
@@ -840,11 +959,12 @@
 
 <script>
   // ── State ─────────────────────────────────────────────────────
-  let pdfBase64   = null;
-  let jsonLoans   = null;
-  let allResults  = [];
-  let activeFilter = 'all';
-  let activeTab   = 'single';
+  let pdfBase64        = null;
+  let jsonLoans        = null;
+  let encompassLoans   = null;
+  let allResults       = [];
+  let activeFilter     = 'all';
+  let activeTab        = 'single';
 
   // ── Provider Badge ────────────────────────────────────────────
   async function loadProviderInfo() {
@@ -902,16 +1022,17 @@
   }
 
   function syncPdfZones(name, size) {
-    ['pdfLabel','pdfLabelBatch'].forEach(id => {
+    ['pdfLabel','pdfLabelBatch','pdfLabelEncompass'].forEach(id => {
       document.getElementById(id).textContent = `✓  ${name}  (${(size/1024).toFixed(0)} KB)`;
     });
-    ['pdfZone','pdfZoneBatch'].forEach(id => {
+    ['pdfZone','pdfZoneBatch','pdfZoneEncompass'].forEach(id => {
       document.getElementById(id).classList.add('loaded');
     });
   }
 
-  setupPdfZone('pdfFile',      'pdfZone',      'pdfLabel');
-  setupPdfZone('pdfFileBatch', 'pdfZoneBatch', 'pdfLabelBatch');
+  setupPdfZone('pdfFile',        'pdfZone',        'pdfLabel');
+  setupPdfZone('pdfFileBatch',   'pdfZoneBatch',   'pdfLabelBatch');
+  setupPdfZone('pdfFileEncompass','pdfZoneEncompass','pdfLabelEncompass');
 
   // ── JSON Upload ───────────────────────────────────────────────
   const jsonDrop  = document.getElementById('jsonDrop');
@@ -953,11 +1074,9 @@
 
     if (!pdfBase64) { showError('Please upload the guidelines PDF first.'); return; }
 
-    if (activeTab === 'single') {
-      await evaluateSingle();
-    } else {
-      await evaluateBatch();
-    }
+    if (activeTab === 'single')    await evaluateSingle();
+    else if (activeTab === 'encompass') await evaluateEncompassJson();
+    else                           await evaluateBatch();
   }
 
   async function evaluateSingle() {
@@ -976,6 +1095,128 @@
       const data = await res.json();
       if (!res.ok) { showError(data.error || `API error ${res.status}`); return; }
       renderResults([data]);
+    } catch (err) {
+      showError(`Network error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Encompass JSON evaluate ──────────────────────────────────────
+  function onEncompassJsonChange() {
+    const raw = document.getElementById('encompassJson').value.trim();
+    const status = document.getElementById('encompassJsonStatus');
+    if (!raw) { status.style.display = 'none'; return; }
+    try {
+      const parsed = JSON.parse(raw);
+      const loans  = Array.isArray(parsed) ? parsed
+                   : parsed.loans          ? parsed.loans
+                   : [parsed];
+      encompassLoans = loans;
+      status.style.display = 'block';
+      status.style.color   = 'var(--pass)';
+      status.textContent   = `✓  ${loans.length} loan${loans.length !== 1 ? 's' : ''} detected`;
+    } catch (e) {
+      encompassLoans = null;
+      status.style.display = 'block';
+      status.style.color   = 'var(--fail)';
+      status.textContent   = `✗  Invalid JSON: ${e.message}`;
+    }
+  }
+
+  function pasteEncompassSample() {
+    const sample = {
+      // v3 standard field names (aligned to Encompass contract paths)
+      loanNumber:                   "2025-001234",
+      loanProgramName:              "FNMA Standard DU",
+      baseLoanAmount:               650000,
+      mortgageType:                 "Conventional",
+      loanAmortizationType:         "Fixed",
+      loanAmortizationTermMonths:   360,
+      requestedInterestRatePercent: 7.125,
+      ltv:   89.5,
+      combinedLtv: 89.5,
+      loanProductData: {
+        gsePropertyType: "Detached"
+      },
+      property: {
+        loanPurposeType:       "Purchase",
+        propertyUsageType:     "PrimaryResidence",
+        gsePropertyType:       "SingleFamily",
+        state:                 "CA",
+        financedNumberOfUnits: 1
+      },
+      channel: "Banked - Retail",
+      applications: [{
+        borrower: {
+          firstNameWithMiddleName:  "John A",
+          lastNameWithSuffix:       "Smith",
+          middleFicoScore:          "742",
+          experianCreditScore:      "745",
+          equifaxScore:             "742",
+          transUnionScore:          "738",
+          firstTimeHomeBuyer:       false,
+          bankruptcyIndicator:      false,
+          propertyForeclosedPastSevenYearsIndicator: false,
+          employment: [{
+            owner:                    "Borrower",
+            employerName:             "Acme Corp",
+            selfEmployedIndicator:    false,
+            currentEmploymentIndicator: true,
+            timeOnJobTermYears:       5,
+            basePayAmount:            8500,
+            monthlyIncomeAmount:      8500
+          }]
+        },
+        coborrower: {
+          firstNameWithMiddleName: "Jane",
+          lastNameWithSuffix:      "Smith",
+          middleFicoScore:         "738"
+        },
+        income: [
+          { owner: "Borrower", incomeType: "Base", amount: 8500 }
+        ],
+        propertyUsageType: "PrimaryResidence",
+        topRatioPercent:    28.5,
+        bottomRatioPercent: 43.2
+      }],
+      firstTimeHomebuyersIndicator: false,
+      reservesMonths:               "6",
+      impoundType:                  "FullEscrow",
+      prepaymentPenaltyIndicator:   false,
+      riskAssessmentType:           "DU"
+    };
+    document.getElementById('encompassJson').value = JSON.stringify(sample, null, 2);
+    onEncompassJsonChange();
+  }
+
+  async function evaluateEncompassJson() {
+    const raw = document.getElementById('encompassJson').value.trim();
+    if (!raw) { showError('Please paste an Encompass loan JSON first.'); return; }
+    if (!encompassLoans) { showError('JSON is invalid — please fix the errors shown below the text area.'); return; }
+
+    const count = encompassLoans.length;
+    setLoading(true, count === 1 ? 'Evaluating Encompass loan…' : `Evaluating ${count} Encompass loans…`);
+    showProgress(count > 1, 0, count);
+
+    try {
+      const res = await fetch('/api/evaluate-encompass', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          encompassLoan: encompassLoans.length === 1 ? encompassLoans[0] : encompassLoans,
+          pdfBase64
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || `API error ${res.status}`); return; }
+
+      // Single result has overall_status at top level; batch has data.results array
+      const results = data.results ?? [data];
+      showProgress(count > 1, count, count);
+      setTimeout(() => showProgress(false), 800);
+      renderResults(results);
     } catch (err) {
       showError(`Network error: ${err.message}`);
     } finally {
@@ -1011,35 +1252,79 @@
   function collectFormLoan() {
     const g = id => document.getElementById(`f-${id}`)?.value?.trim() || '';
     const n = id => parseFloat(g(id)) || 0;
+
+    // Auto-build creditEvent from structured derogatory fields if the free-text field is empty
+    function deriveCreditEvent() {
+      const manual = g('creditEvent');
+      if (manual) return manual;
+      const parts = [];
+      if (g('bankruptcyIndicator') === 'Y') {
+        let desc = 'Bankruptcy';
+        if (g('bankruptcyType'))   desc += ` Ch.${g('bankruptcyType')}`;
+        if (g('bankruptcyStatus')) desc += ` (${g('bankruptcyStatus')})`;
+        if (g('bankruptcyDate'))   desc += ` ${g('bankruptcyDate')}`;
+        parts.push(desc);
+      }
+      if (g('foreclosureIndicator') === 'Y') {
+        let desc = 'Foreclosure';
+        if (g('foreclosureDate')) desc += ` ${g('foreclosureDate')}`;
+        parts.push(desc);
+      }
+      return parts.join('; ');
+    }
+
     return {
-      loanNumber:            g('loanNumber'),
-      loanProgram:           g('loanProgram'),
-      loanAmount:            n('loanAmount'),
-      loanType:              g('loanType'),
-      loanPurpose:           g('loanPurpose'),
-      occupancyStatus:       g('occupancyStatus'),
-      amortType:             g('amortType'),
-      ficoScore:             n('ficoScore'),
-      creditEvent:           g('creditEvent'),
-      housingHistory:        g('housingHistory'),
-      citizenship:           g('citizenship'),
-      propertyType:          g('propertyType'),
-      units:                 n('units') || 1,
-      state:                 g('state').toUpperCase(),
-      isRural:               g('isRural'),
-      isNonWarrantable:      g('isNonWarrantable'),
-      ltv:                   n('ltv'),
-      cltv:                  n('cltv'),
-      dtiTop:                n('dtiTop'),
-      dtiBottom:             n('dtiBottom'),
-      interestRate:          n('interestRate'),
-      termMonths:            n('termMonths') || 360,
-      interestOnlyIndicator: g('interestOnlyIndicator'),
-      interestOnlyMonths:    n('interestOnlyMonths'),
-      incomeDocType:         g('incomeDocType'),
-      prepaymentPenalty:     g('prepaymentPenalty'),
-      prepaymentPeriod:      n('prepaymentPeriod'),
-      escrow:                g('escrow'),
+      // Identity
+      loanNumber:             g('loanNumber'),
+      loanProgram:            g('loanProgram'),
+      loanAmount:             n('loanAmount'),
+      loanType:               g('loanType'),
+      loanPurpose:            g('loanPurpose'),
+      occupancyStatus:        g('occupancyStatus'),
+      amortType:              g('amortType'),
+      // Borrower
+      ficoScore:              n('ficoScore'),
+      creditEvent:            deriveCreditEvent(),
+      housingHistory:         g('housingHistory'),
+      citizenship:            g('citizenship'),
+      firstTimeHomeBuyer:     g('firstTimeHomeBuyer'),
+      nonOccupantBorrower:    g('nonOccupantBorrower'),
+      numFinancedProperties:  n('numFinancedProperties') || 1,
+      selfEmployed:           g('selfEmployed'),
+      // Derogatory credit
+      bankruptcyIndicator:    g('bankruptcyIndicator'),
+      bankruptcyType:         g('bankruptcyType'),
+      bankruptcyDate:         g('bankruptcyDate'),
+      bankruptcyStatus:       g('bankruptcyStatus'),
+      foreclosureIndicator:   g('foreclosureIndicator'),
+      foreclosureDate:        g('foreclosureDate'),
+      // Property
+      propertyType:           g('propertyType'),
+      units:                  n('units') || 1,
+      state:                  g('state').toUpperCase(),
+      isRural:                g('isRural'),
+      isNonWarrantable:       g('isNonWarrantable'),
+      isManufactured:         g('isManufactured'),
+      isHighBalance:          g('isHighBalance'),
+      subordinateFinancing:   g('subordinateFinancing'),
+      // Financials
+      ltv:                    n('ltv'),
+      cltv:                   n('cltv'),
+      hcltv:                  n('hcltv'),
+      dtiTop:                 n('dtiTop'),
+      dtiBottom:              n('dtiBottom'),
+      reservesMonths:         n('reservesMonths'),
+      interestRate:           n('interestRate'),
+      termMonths:             n('termMonths') || 360,
+      // Features
+      interestOnlyIndicator:  g('interestOnlyIndicator'),
+      interestOnlyMonths:     n('interestOnlyMonths'),
+      incomeDocType:          g('incomeDocType'),
+      prepaymentPenalty:      g('prepaymentPenalty'),
+      prepaymentPeriod:       n('prepaymentPeriod'),
+      escrow:                 g('escrow'),
+      // Agency / FNMA
+      riskAssessType:         g('riskAssessType'),
     };
   }
 
@@ -1092,6 +1377,49 @@
 
     const provider = r.provider ? `<div class="rc-provider">via ${esc(r.provider)}</div>` : '';
 
+    // Mapped fields strip (Encompass mode only)
+    let mappedStrip = '';
+    if (r.mapped_fields) {
+      const mf = r.mapped_fields;
+
+      // Build a compact derogatory credit label when present
+      let derogsLabel = '';
+      if (mf.bankruptcyIndicator === 'Y') {
+        derogsLabel = 'BK';
+        if (mf.bankruptcyType)   derogsLabel += ` Ch.${mf.bankruptcyType}`;
+        if (mf.bankruptcyStatus) derogsLabel += ` ${mf.bankruptcyStatus}`;
+        if (mf.bankruptcyDate)   derogsLabel += ` ${mf.bankruptcyDate}`;
+      }
+      if (mf.foreclosureIndicator === 'Y') {
+        const fc = mf.foreclosureDate ? `FC ${mf.foreclosureDate}` : 'FC';
+        derogsLabel = derogsLabel ? `${derogsLabel}; ${fc}` : fc;
+      }
+
+      const pairs = [
+        ['Type',     mf.loanType    || ''],
+        ['Program',  mf.loanProgram || ''],
+        ['Amount',   mf.loanAmount  ? `$${Number(mf.loanAmount).toLocaleString()}` : ''],
+        ['Purpose',  mf.loanPurpose || ''],
+        ['Occ',      mf.occupancyStatus || ''],
+        ['LTV',      mf.ltv   ? `${mf.ltv}%`   : ''],
+        ['CLTV',     mf.cltv  ? `${mf.cltv}%`  : ''],
+        ['FICO',     mf.ficoScore  ? String(mf.ficoScore)  : ''],
+        ['DTI',      mf.dtiBottom ? `${mf.dtiBottom}%` : ''],
+        ['State',    mf.state || ''],
+        ['UW',       mf.riskAssessType ? mf.riskAssessType.replace(/\(.*\)/, '').trim() : ''],
+        ['Reserves', mf.reservesMonths ? `${mf.reservesMonths}mo` : ''],
+        ['Self-Emp', mf.selfEmployed === 'Y' ? 'Yes' : ''],
+        ['Derog',    derogsLabel],
+      ].filter(([,v]) => v);
+
+      mappedStrip = pairs.length
+        ? `<div style="padding:.45rem 1.1rem .35rem;background:#f5f6f8;border-top:1px solid var(--border);font-size:.67rem;display:flex;flex-wrap:wrap;gap:.2rem .65rem">
+            <span style="color:var(--ink-4);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-right:.2rem">Encompass fields:</span>
+            ${pairs.map(([k,v]) => `<span><span style="color:var(--ink-4)">${k}:</span> ${esc(String(v))}</span>`).join('')}
+           </div>`
+        : '';
+    }
+
     return `
       <div class="result-card status-${status}">
         <div class="rc-header">
@@ -1100,6 +1428,7 @@
           <span class="rc-summary">${esc(r.summary || '')}</span>
           <span class="rc-chevron">▾</span>
         </div>
+        ${mappedStrip}
         <div class="rc-body">
           <div class="tests-grid">${tests}</div>
           ${provider}

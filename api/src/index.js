@@ -4,3 +4,4 @@
 require('./functions/evaluateLoan');
 require('./functions/evaluateBatch');
 require('./functions/fieldMap');
+require('./functions/evaluateEncompass');

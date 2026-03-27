@@ -3,9 +3,9 @@
 const { SYSTEM_PROMPT, formatLoanMessage } = require('./systemPrompt');
 const { parseResponse } = require('./anthropicClient');
 
-const AZURE_ENDPOINT  = 'https://smart-advisor-ai.openai.azure.com';
-const DEPLOYMENT_NAME = 'gpt-4o';
-const API_VERSION     = '2024-12-01-preview';
+const AZURE_ENDPOINT  = process.env.AZURE_OPENAI_ENDPOINT  || 'https://smart-advisor-ai.openai.azure.com';
+const DEPLOYMENT_NAME = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o';
+const API_VERSION     = process.env.AZURE_OPENAI_API_VERSION || '2024-12-01-preview';
 const BASE_URL = `${AZURE_ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=${API_VERSION}`;
 
 // Tuning constants
