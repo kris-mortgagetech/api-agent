@@ -1,105 +1,73 @@
 'use strict';
 
-const { app }              = require('@azure/functions');
-const { mapFromJson }      = require('../services/encompassMapper');
-const { EligibilityAgent } = require('../services/eligibilityAgent');
+const { app } = require('@azure/functions');
 
 /**
- * POST /api/evaluate-encompass
+ * Proxy: POST /api/evaluate-encompass
  *
- * Accepts a raw Encompass v3 loan JSON (single loan, array, or {loans:[...]} wrapper)
- * and maps it to the normalised loan shape before evaluating eligibility.
+ * Forwards the request to the AltPlusEligibility API on kind-grass.
+ * Lives on the salmon-flower SWA so the browser call is same-origin
+ * and bypasses the Content-Security-Policy connect-src restriction.
  *
- * Request body:
- * {
- *   "encompassLoan": { ...raw Encompass loan object... },
- *   "pdfBase64": "<base64-encoded PDF bytes>"
- * }
- *
- * Or for a batch (paste straight from Encompass export):
- * {
- *   "encompassLoan": [ { ...loan 1... }, { ...loan 2... } ],
- *   "pdfBase64": "..."
- * }
+ * Deploy to: api/src/functions/evaluateEncompass.js  (salmon-flower project)
  */
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age':       '86400',
-};
+
+const UPSTREAM = 'https://kind-grass-048f5d010.2.azurestaticapps.net/api/evaluate-encompass';
 
 app.http('evaluate-encompass', {
   methods:   ['POST', 'OPTIONS'],
   authLevel: 'anonymous',
   handler:   async (request, context) => {
 
-    // Handle CORS preflight
+    // CORS preflight (shouldn't be needed for same-origin, but just in case)
     if (request.method === 'OPTIONS') {
-      return { status: 204, headers: CORS_HEADERS, body: '' };
+      return { status: 204, headers: corsHeaders(), body: '' };
     }
 
-    context.log('evaluate-encompass: request received');
+    context.log('[proxy] evaluate-encompass → forwarding to kind-grass');
 
-    let body;
+    let bodyText;
     try {
-      body = await request.json();
-    } catch {
-      return err(400, 'Request body must be valid JSON');
-    }
-
-    const { encompassLoan, pdfBase64 } = body;
-
-    if (!encompassLoan) return err(400, 'Missing required field: "encompassLoan"');
-    if (!pdfBase64)     return err(400, 'Missing required field: "pdfBase64"');
-
-    // ── Map Encompass → normalised loans ──────────────────────────
-    let loans;
-    try {
-      loans = mapFromJson(encompassLoan);
+      bodyText = await request.text();
     } catch (e) {
-      return err(400, `Encompass JSON mapping failed: ${e.message}`);
+      return err(400, 'Could not read request body: ' + e.message);
     }
 
-    if (!loans.length) return err(400, 'No loans found in encompassLoan payload');
-
-    // ── Init agent ────────────────────────────────────────────────
-    let agent;
+    let upstream;
     try {
-      agent = new EligibilityAgent();
+      upstream = await fetch(UPSTREAM, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    bodyText,
+      });
     } catch (e) {
-      return err(500, `Configuration error: ${e.message}`);
+      context.log('[proxy] upstream fetch failed: ' + e.message);
+      return err(502, 'Upstream unreachable: ' + e.message);
     }
 
-    // ── Evaluate (single or batch) ────────────────────────────────
-    try {
-      if (loans.length === 1) {
-        const result = await agent.evaluateLoan(loans[0], pdfBase64);
-        return ok({ ...result, provider: agent.providerName, mapped_fields: loans[0] });
-      }
+    const responseText = await upstream.text();
+    context.log('[proxy] upstream status: ' + upstream.status);
 
-      // Batch with delay between calls
-      const results = [];
-      for (let i = 0; i < loans.length; i++) {
-        if (i > 0) await sleep(1500);
-        context.log(`evaluate-encompass: loan ${i + 1}/${loans.length} — ${loans[i].loanNumber || 'unknown'}`);
-        const result = await agent.evaluateLoan(loans[i], pdfBase64);
-        results.push({ ...result, mapped_fields: loans[i] });
-      }
-
-      return ok({ results, total: results.length, provider: agent.providerName });
-
-    } catch (e) {
-      context.log(`ERROR: ${e.message}`);
-      return err(502, `LLM evaluation error: ${e.message}`);
-    }
+    return {
+      status:  upstream.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+      body:    responseText,
+    };
   },
 });
 
-function ok(data) {
-  return { status: 200, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }, body: JSON.stringify(data) };
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
 }
+
 function err(status, message) {
-  return { status, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }, body: JSON.stringify({ error: message }) };
+  return {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    body:    JSON.stringify({ error: message }),
+  };
 }
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
