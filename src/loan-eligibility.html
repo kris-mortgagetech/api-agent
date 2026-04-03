@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loan Eligibility Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & Tokens ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:      #0f1419;
+  --ink-2:    #374151;
+  --ink-3:    #6b7280;
+  --ink-4:    #9ca3af;
+  --paper:    #fafaf8;
+  --paper-2:  #f3f2ef;
+  --paper-3:  #e8e6e1;
+  --border:   #ddd9d0;
+
+  --pass:     #14532d;
+  --pass-bg:  #dcfce7;
+  --pass-mid: #16a34a;
+  --warn:     #78350f;
+  --warn-bg:  #fef3c7;
+  --warn-mid: #d97706;
+  --fail:     #7f1d1d;
+  --fail-bg:  #fee2e2;
+  --fail-mid: #dc2626;
+
+  --accent:   #1a3a6b;
+  --accent-2: #2c5282;
+  --accent-lt:#dbeafe;
+
+  --radius:   6px;
+  --radius-lg:12px;
+  --shadow:   0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:0 4px 12px rgba(0,0,0,.10), 0 2px 4px rgba(0,0,0,.06);
+
+  --font-serif: 'DM Serif Display', Georgia, serif;
+  --font-sans:  'DM Sans', system-ui, sans-serif;
+  --font-mono:  'DM Mono', 'Courier New', monospace;
+}
+
+html { font-size: 15px; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-weight: 300;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+header {
+  background: var(--ink);
+  color: #fff;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  height: 56px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  position: sticky; top: 0; z-index: 100;
+}
+.wordmark { font-family: var(--font-serif); font-size: 1.25rem; letter-spacing: .01em; }
+.wordmark span { color: #93c5fd; }
+.hdr-divider { width: 1px; height: 20px; background: rgba(255,255,255,.15); }
+.hdr-subtitle { font-size: .78rem; color: rgba(255,255,255,.45); letter-spacing: .06em; text-transform: uppercase; }
+.hdr-spacer { flex: 1; }
+.hdr-loan-id {
+  font-family: var(--font-mono); font-size: .75rem;
+  color: rgba(255,255,255,.55); background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.12); padding: .25rem .75rem; border-radius: 4px;
+  max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.provider-badge {
+  font-size: .72rem; font-family: var(--font-mono);
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+  color: rgba(255,255,255,.6); padding: .2rem .6rem; border-radius: 4px;
+}
+
+/* ── Page ── */
+.page { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+/* ── State cards (loading / error) ── */
+.state-card {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 2rem 2rem; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; align-items: center;
+}
+.state-card .sc-icon  { font-size: 2.5rem; margin-bottom: 1rem; }
+.state-card .sc-title { font-family: var(--font-serif); font-size: 1.4rem; font-weight: 400; margin-bottom: .5rem; }
+.state-card .sc-msg   { font-size: .85rem; color: var(--ink-3); line-height: 1.6; max-width: 480px; margin: 0 auto; }
+.state-card.error .sc-title { color: var(--fail-mid); }
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin-ring {
+  display: inline-block; width: 40px; height: 40px;
+  border: 3px solid var(--paper-3); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin .75s linear infinite; margin-bottom: 1rem;
+}
+
+/* ── Progress ── */
+.progress-card {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 1.5rem 2rem; box-shadow: var(--shadow); display: none;
+}
+.progress-card.visible { display: block; }
+.progress-title { font-size: .9rem; font-weight: 500; color: var(--ink-2); margin-bottom: .75rem; }
+.progress-track {
+  height: 6px; background: var(--paper-3); border-radius: 99px; overflow: hidden; margin-bottom: .5rem;
+}
+.progress-fill {
+  height: 100%; background: var(--accent); border-radius: 99px; transition: width .35s ease; width: 0%;
+}
+.progress-sub { font-size: .75rem; color: var(--ink-3); }
+
+/* ── Summary bar ── */
+.summary-bar {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; margin-bottom: 1.5rem;
+}
+.summary-card {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem; box-shadow: var(--shadow);
+}
+.summary-card .sc-label {
+  font-size: .7rem; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3); margin-bottom: .25rem;
+}
+.summary-card .sc-val {
+  font-family: var(--font-serif); font-size: 2rem; line-height: 1;
+}
+.summary-card .sc-sub { font-size: .72rem; color: var(--ink-4); margin-top: .2rem; }
+.summary-card.s-total .sc-val { color: var(--ink); }
+.summary-card.s-pass  .sc-val { color: var(--pass-mid); }
+.summary-card.s-warn  .sc-val { color: var(--warn-mid); }
+.summary-card.s-fail  .sc-val { color: var(--fail-mid); }
+
+/* ── Loan fields strip ── */
+.loan-strip {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg);
+  padding: .85rem 1.25rem; margin-bottom: 1.25rem; box-shadow: var(--shadow);
+}
+.loan-strip-label {
+  font-size: .68rem; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-4); margin-bottom: .45rem;
+}
+.loan-strip-fields {
+  display: flex; flex-wrap: wrap; gap: .15rem .9rem; font-size: .78rem;
+}
+.lsf-key { color: var(--ink-4); }
+.lsf-val { color: var(--ink-2); font-weight: 500; }
+
+/* ── Results heading + filter pills ── */
+.results-hdr {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;
+}
+.results-hdr h2 { font-family: var(--font-serif); font-size: 1.2rem; font-weight: 400; }
+.filter-pills { display: flex; gap: .4rem; }
+.pill {
+  padding: .25rem .75rem; border-radius: 99px; font-size: .72rem; font-weight: 500;
+  cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--ink-3);
+  transition: all .15s;
+}
+.pill.active-all  { background: var(--ink);      color: #fff; border-color: var(--ink); }
+.pill.active-pass { background: var(--pass-bg);  color: var(--pass); border-color: var(--pass-mid); }
+.pill.active-warn { background: var(--warn-bg);  color: var(--warn); border-color: var(--warn-mid); }
+.pill.active-fail { background: var(--fail-bg);  color: var(--fail); border-color: var(--fail-mid); }
+
+/* ── Result card ── */
+.result-card {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg);
+  overflow: hidden; box-shadow: var(--shadow); transition: box-shadow .15s; margin-bottom: .75rem;
+}
+.result-card:hover { box-shadow: var(--shadow-md); }
+.result-card.status-Pass    { border-left: 4px solid var(--pass-mid); }
+.result-card.status-Warning { border-left: 4px solid var(--warn-mid); }
+.result-card.status-Fail    { border-left: 4px solid var(--fail-mid); }
+
+.rc-header {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .9rem 1.1rem; cursor: pointer; user-select: none;
+}
+.rc-badge {
+  padding: .2rem .6rem; border-radius: 4px;
+  font-size: .7rem; font-weight: 600; letter-spacing: .04em; flex-shrink: 0;
+}
+.status-Pass    .rc-badge { background: var(--pass-bg); color: var(--pass); }
+.status-Warning .rc-badge { background: var(--warn-bg); color: var(--warn); }
+.status-Fail    .rc-badge { background: var(--fail-bg); color: var(--fail); }
+
+.rc-name    { font-weight: 600; font-size: .9rem; color: var(--ink); flex-shrink: 0; }
+.rc-summary { font-size: .8rem; color: var(--ink-3); flex: 1; }
+.rc-count   { font-size: .75rem; color: var(--ink-4); white-space: nowrap; flex-shrink: 0; }
+.rc-chevron { color: var(--ink-4); font-size: .75rem; transition: transform .2s; flex-shrink: 0; }
+.result-card.open .rc-chevron { transform: rotate(180deg); }
+
+/* detail body */
+.rc-body { display: none; border-top: 1px solid var(--paper-3); }
+.result-card.open .rc-body { display: block; }
+
+/* 2-col test grid */
+.tests-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .45rem;
+  padding: .85rem 1.1rem;
+}
+@media (max-width: 600px) { .tests-grid { grid-template-columns: 1fr; } }
+
+.test-item {
+  display: flex; align-items: flex-start; gap: .5rem;
+  padding: .55rem .7rem; border-radius: var(--radius);
+  background: var(--paper); border: 1px solid var(--paper-3);
+}
+.test-dot {
+  width: 8px; height: 8px; border-radius: 50%; margin-top: .35rem; flex-shrink: 0;
+}
+.test-item.t-Pass    .test-dot { background: var(--pass-mid); }
+.test-item.t-Warning .test-dot { background: var(--warn-mid); }
+.test-item.t-Fail    .test-dot { background: var(--fail-mid); }
+.test-name   { font-size: .75rem; font-weight: 500; color: var(--ink-2); }
+.test-reason { font-size: .7rem; color: var(--ink-3); line-height: 1.4; margin-top: .1rem; }
+
+.rc-provider {
+  padding: .5rem 1.1rem .65rem;
+  font-size: .68rem; color: var(--ink-4); font-family: var(--font-mono);
+  border-top: 1px solid var(--paper-3);
+}
+
+/* ── Timestamp ── */
+.run-ts {
+  font-size: .72rem; color: var(--ink-4); text-align: center;
+  padding-top: 1.5rem; font-family: var(--font-mono);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+/* ── Run button ── */
+.btn-run {
+  display: inline-flex; align-items: center; gap: .6rem;
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius); padding: .8rem 1.75rem;
+  font-family: var(--font-sans); font-size: .9rem; font-weight: 500;
+  cursor: pointer; transition: background .15s, transform .1s;
+  margin-top: 1.5rem;
+}
+.btn-run:hover:not(:disabled) { background: var(--accent-2); }
+.btn-run:active:not(:disabled) { transform: scale(.99); }
+.btn-run:disabled { opacity: .45; cursor: not-allowed; }
+.btn-run .btn-spinner {
+  width: 15px; height: 15px;
+  border: 2px solid rgba(255,255,255,.3); border-top-color: #fff;
+  border-radius: 50%; animation: spin .7s linear infinite; display: none;
+}
+.btn-run.loading .btn-spinner { display: block; }
+.btn-run.loading .btn-label::before { content: 'Running…'; }
+.btn-run:not(.loading) .btn-label::before { content: '▶ Check Eligibility — All Programs'; }
+
+/* ── Matrix count header ── */
+.matrix-count {
+  width: 100%; max-width: 420px;
+  font-size: 1rem; font-weight: 700; text-transform: uppercase;
+  color: var(--ink);
+  padding-bottom: .6rem; margin-bottom: .25rem;
+  border-bottom: 1px solid var(--paper-3);
+}
+
+/* ── Matrix list on landing ── */
+.matrix-list {
+  display: flex; flex-direction: column; gap: .5rem;
+  width: 100%; max-width: 420px; margin: 0 auto 1.5rem;
+}
+.matrix-row {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .7rem 1rem; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--paper);
+  font-size: .85rem; color: var(--ink-2);
+}
+.matrix-row-icon { font-size: 1rem; color: var(--ink-4); flex-shrink: 0; }
+.matrix-row-name { flex: 1; font-weight: 400; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+/* ── Print ── */
+@media print {
+  header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .rc-body { display: block !important; }
+  .result-card { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">Loan Eligibility</div>
+  <div class="hdr-divider"></div>
+  <div class="hdr-subtitle">Program Check</div>
+  <div class="hdr-spacer"></div>
+  <div class="hdr-loan-id" id="hdrLoanId">—</div>
+  <div class="provider-badge" id="providerBadge">connecting…</div>
+</header>
+
+<div class="page">
+
+  <!-- Landing / Loading / Error (all share #stateCard) -->
+  <div id="stateCard" class="state-card">
+    <div id="stateError" style="display:none;">
+      <div id="stateIcon" class="sc-icon"></div>
+      <div id="stateTitle" class="sc-title"></div>
+      <div id="stateMsg"   class="sc-msg"></div>
+    </div>
+    <div id="matrixCount" class="matrix-count" style="display:none;"></div>
+    <div id="matrixList" class="matrix-list"></div>
+    <button class="btn-run" id="btnRun" onclick="startRun()" style="display:none;">
+      <div class="btn-spinner"></div>
+      <span class="btn-label"></span>
+    </button>
+  </div>
+
+  <!-- Progress -->
+  <div id="progressCard" class="progress-card">
+    <div class="progress-title" id="progressTitle">Loading matrices…</div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-sub"  id="progressSub"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsArea" style="display:none;">
+
+    <!-- Summary bar -->
+    <div class="summary-bar" id="summaryBar"></div>
+
+    <!-- Loan fields strip -->
+    <div class="loan-strip" id="loanStrip" style="display:none;">
+      <div class="loan-strip-label">Encompass Fields</div>
+      <div class="loan-strip-fields" id="loanStripFields"></div>
+    </div>
+
+    <!-- Filter + results list -->
+    <div class="results-hdr">
+      <h2>Program Eligibility</h2>
+      <div class="filter-pills" id="filterPills">
+        <button class="pill active-all" data-f="all"     onclick="applyFilter('all')">All</button>
+        <button class="pill"            data-f="Pass"    onclick="applyFilter('Pass')">Pass</button>
+        <button class="pill"            data-f="Warning" onclick="applyFilter('Warning')">Warning</button>
+        <button class="pill"            data-f="Fail"    onclick="applyFilter('Fail')">Fail</button>
+      </div>
+    </div>
+
+    <div id="resultsList"></div>
+    <div class="run-ts" id="runTs"></div>
+
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var API   = 'https://api.elliemae.com';
+  var CO    = '/encompass/v1/company/customObjects/fx-status-panel-settings.json';
+  var EVAL  = '/api/evaluate-encompass';   // same-origin — kind-grass SWA
+
+  var loanId = '';
+  var token  = '';
+
+  // ── Credential resolution — 3 paths ───────────────────────────
+  //
+  //  Priority:
+  //    1. URL hash     → #loanId=...&token=...   (never sent to server/logs)
+  //    2. querystring  → ?loanId=...&token=...   (simple, short-lived tokens ok)
+  //    3. postMessage  → { type:'elig-credentials', loanId, token }
+  //                      (launched by workbook via window.open — most secure)
+  //
+  function parseKV(str) {
+    var out = {};
+    str.replace(/^[?#]/, '').split('&').forEach(function(p) {
+      var kv = p.split('=');
+      if (kv[0]) out[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+    });
+    return out;
+  }
+
+  function extractCreds(obj) {
+    return {
+      loanId : obj.loanId || obj.loanid || obj.loan_id || obj.guid || '',
+      token  : obj.token  || obj.access_token || obj.bearer || ''
+    };
+  }
+
+  // Path 1 — hash (preferred: invisible to servers)
+  var hash = parseKV(location.hash);
+  var fromHash = extractCreds(hash);
+
+  // Path 2 — querystring (fallback)
+  var qs = parseKV(location.search);
+  var fromQS = extractCreds(qs);
+
+  if (fromHash.loanId && fromHash.token) {
+    loanId = fromHash.loanId;
+    token  = fromHash.token;
+    // Clear hash so token isn't visible after load
+    history.replaceState(null, '', location.pathname + (location.search || ''));
+    init('URL hash');
+
+  } else if (fromQS.loanId && fromQS.token) {
+    loanId = fromQS.loanId;
+    token  = fromQS.token;
+    init('URL querystring');
+
+  } else if (fromQS.loanId || fromHash.loanId) {
+    // Have loanId but no token — wait for postMessage
+    loanId = fromQS.loanId || fromHash.loanId;
+    waitForPostMessage();
+
+  } else {
+    // Nothing — show usage instructions
+    showUsage();
+  }
+
+  // ── Path 3: postMessage listener ─────────────────────────────
+  function waitForPostMessage() {
+    el('hdrLoanId').textContent = 'Loan ' + loanId;
+    showLanding(null);
+
+    var timeout = setTimeout(function() {
+      showError('Token Not Received',
+        'No credentials arrived via postMessage within 10 seconds.');
+    }, 10000);
+
+    window.addEventListener('message', function onMsg(e) {
+      var d = e.data || {};
+      if (d.type !== 'elig-credentials' && d.type !== 'encompass-credentials') return;
+      var t = d.token || d.bearer || (d.payload && (d.payload.bearerToken || d.payload.token)) || '';
+      var l = d.loanId || (d.payload && d.payload.loanId) || loanId;
+      if (!t) return;
+      clearTimeout(timeout);
+      window.removeEventListener('message', onMsg);
+      loanId = l || loanId;
+      token  = t;
+      init('postMessage');
+    });
+  }
+
+  // ── Path 3 also: listen even when we have a token,
+  //    in case a fresher token arrives (token refresh scenario)
+  window.addEventListener('message', function(e) {
+    var d = e.data || {};
+    if (d.type !== 'elig-credentials' && d.type !== 'encompass-credentials') return;
+    var newToken = d.token || d.bearer || (d.payload && (d.payload.bearerToken || d.payload.token)) || '';
+    if (newToken && newToken !== token) {
+      token = newToken;
+      console.log('[LoanEligibility] Token refreshed via postMessage');
+    }
+  });
+
+  // ── Init: load matrices and show Run button ───────────────────
+  function init(credSource) {
+    el('hdrLoanId').textContent = 'Loan ' + loanId;
+    showLanding(null);
+
+    fetch(API + CO, {
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }
+    })
+    .then(checkOk)
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      if (!res.dataObject) throw new Error('No settings data in custom object.');
+      var dec = JSON.parse(decodeURIComponent(escape(atob(res.dataObject))));
+      var all      = dec.eligibilityMatrix || [];
+      var matrices = all.filter(function(m) { return !!m.attachment; });
+      if (matrices.length === 0)
+        throw new Error('No matrices with attached PDFs found in Status Panel Settings.');
+
+      window._eligMatrices = matrices;
+      showLanding(matrices);
+    })
+    .catch(function(err) {
+      showError('Could Not Load Matrices', err.message +
+        '<br><br>Check that your token is valid and not expired.');
+    });
+  }
+
+  // ── Run button handler ────────────────────────────────────────
+  window.startRun = function() {
+    var matrices = window._eligMatrices;
+    if (!matrices || !matrices.length) return;
+    var btn = el('btnRun');
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    showCard('progress');
+    setProgress('Fetching loan from Encompass…', 10, '');
+
+    fetch(API + '/encompass/v3/loans/' + loanId, {
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      redirect: 'follow'
+    })
+    .then(checkOk)
+    .then(function(r) { return r.json(); })
+    .then(function(loanJson) {
+      setProgress('Evaluating ' + matrices.length + ' program' + (matrices.length !== 1 ? 's' : '') + '…', 20, 'Loan loaded');
+      var results = [];
+      var chain   = Promise.resolve();
+
+      matrices.forEach(function(m, i) {
+        chain = chain.then(function() {
+          var pct = 20 + Math.round(((i + 1) / matrices.length) * 75);
+          setProgress(
+            'Evaluating ' + (i + 1) + ' / ' + matrices.length + ': ' + m.name + '…',
+            pct, ''
+          );
+          return fetch(EVAL, {
+            method : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body   : JSON.stringify({ encompassLoan: loanJson, pdfBase64: m.attachment })
+          })
+          .then(function(r) { return r.text(); })
+          .then(function(txt) {
+            if (!txt || !txt.trim()) throw new Error('Empty response');
+            var data = JSON.parse(txt);
+            results.push({ matrix: m, data: data, error: null });
+          })
+          .catch(function(e) {
+            results.push({ matrix: m, data: null, error: e.message });
+          });
+        });
+      });
+
+      return chain.then(function() {
+        setProgress('Complete', 100, results.length + ' programs evaluated');
+        setTimeout(function() {
+          showCard('results');
+          render(results);
+        }, 500);
+      });
+    })
+    .catch(function(err) {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      showCard('state');
+      showError('Run Failed', err.message);
+    });
+  };
+
+  // ── Render ────────────────────────────────────────────────────
+  var _allResults = [];
+  var _filter     = 'all';
+
+  function render(results) {
+    _allResults = results;
+    _filter     = 'all';
+    updatePills();
+
+    // Summary bar
+    var pass = 0, warn = 0, fail = 0;
+    results.forEach(function(r) {
+      if (!r.data) return;
+      var s = (r.data.results ? r.data.results[0] : r.data).overall_status || 'Warning';
+      if (s === 'Pass') pass++; else if (s === 'Warning') warn++; else fail++;
+    });
+    el('summaryBar').innerHTML =
+      summCard('s-total', results.length, 'Total',   'programs') +
+      summCard('s-pass',  pass,           'Pass',    'eligible') +
+      summCard('s-warn',  warn,           'Warning', 'review needed') +
+      summCard('s-fail',  fail,           'Fail',    'ineligible');
+
+    // Loan fields strip
+    var firstData = null;
+    results.forEach(function(r) { if (!firstData && r.data) firstData = r.data; });
+    if (firstData) {
+      var mf = (firstData.results ? firstData.results[0] : firstData).mapped_fields || {};
+      var pairs = [
+        ['Type',    mf.loanType    || ''], ['Program',  mf.loanProgram || ''],
+        ['Amount',  mf.loanAmount  ? '$' + Number(mf.loanAmount).toLocaleString() : ''],
+        ['Purpose', mf.loanPurpose || ''], ['Occ',  mf.occupancyStatus || ''],
+        ['LTV',     mf.ltv  ? mf.ltv + '%'  : ''], ['CLTV', mf.cltv ? mf.cltv + '%' : ''],
+        ['FICO',    mf.ficoScore  ? String(mf.ficoScore) : ''],
+        ['DTI',     mf.dtiBottom  ? mf.dtiBottom + '%'  : ''],
+        ['State',   mf.state || ''],
+        ['UW',      mf.riskAssessType ? mf.riskAssessType.replace(/\(.*\)/, '').trim() : ''],
+        ['Reserves',mf.reservesMonths ? mf.reservesMonths + 'mo' : ''],
+        ['Self-Emp',mf.selfEmployed === 'Y' ? 'Yes' : '']
+      ].filter(function(p) { return p[1]; });
+      if (mf.bankruptcyIndicator  === 'Y') pairs.push(['BK', 'Ch.' + (mf.bankruptcyType || '?')]);
+      if (mf.foreclosureIndicator === 'Y') pairs.push(['FC', mf.foreclosureDate || 'Yes']);
+
+      var loanNum = (firstData.results ? firstData.results[0] : firstData).loan_number || '';
+      if (loanNum) el('hdrLoanId').textContent = 'Loan ' + loanNum + '  ·  ' + loanId;
+
+      el('loanStripFields').innerHTML = pairs.map(function(p) {
+        return '<span><span class="lsf-key">' + esc(p[0]) + ': </span>' +
+               '<span class="lsf-val">' + esc(String(p[1])) + '</span></span>';
+      }).join('');
+      el('loanStrip').style.display = '';
+
+      var prov = firstData.provider ||
+        (firstData.results && firstData.results[0] && firstData.results[0].provider) || '';
+      el('providerBadge').textContent = prov || 'Azure OpenAI';
+    }
+
+    renderFiltered();
+    el('runTs').textContent = 'Generated ' + new Date().toLocaleString();
+  }
+
+  function renderFiltered() {
+    var filtered = _filter === 'all' ? _allResults
+      : _allResults.filter(function(r) {
+          if (!r.data) return _filter === 'Warning';
+          var s = (r.data.results ? r.data.results[0] : r.data).overall_status || 'Warning';
+          return s === _filter;
+        });
+    el('resultsList').innerHTML = filtered.map(function(r, ri) { return buildCard(r, ri); }).join('');
+    el('resultsList').querySelectorAll('.rc-header').forEach(function(h) {
+      h.addEventListener('click', function() {
+        h.closest('.result-card').classList.toggle('open');
+      });
+    });
+  }
+
+  function buildCard(r, idx) {
+    if (r.error) {
+      return '<div class="result-card status-Warning">' +
+        '<div class="rc-header">' +
+        '<span class="rc-badge">ERROR</span>' +
+        '<span class="rc-name">' + esc(r.matrix.name) + '</span>' +
+        '<span class="rc-summary">' + esc(r.error) + '</span>' +
+        '</div></div>';
+    }
+    var result  = r.data.results ? r.data.results[0] : r.data;
+    var status  = result.overall_status || 'Warning';
+    var tests   = result.tests || [];
+    var fCount  = tests.filter(function(t) { return t.status === 'Fail'; }).length;
+    var wCount  = tests.filter(function(t) { return t.status === 'Warning'; }).length;
+    var pCount  = tests.filter(function(t) { return t.status === 'Pass'; }).length;
+    var countTxt = (status === 'Fail' || status === 'Warning')
+      ? fCount + ' fail' + (wCount ? ', ' + wCount + ' warn' : '')
+      : pCount + ' checks passed';
+    var provider = r.data.provider || result.provider || '';
+    var testsHtml = tests.map(function(t) {
+      return '<div class="test-item t-' + esc(t.status) + '">' +
+        '<div class="test-dot"></div>' +
+        '<div><div class="test-name">' + esc(t.test_name || '') + '</div>' +
+        '<div class="test-reason">' + esc(t.reason || '') + '</div></div>' +
+        '</div>';
+    }).join('');
+    return '<div class="result-card status-' + esc(status) + '">' +
+      '<div class="rc-header">' +
+      '<span class="rc-badge">' + esc(status.toUpperCase()) + '</span>' +
+      '<span class="rc-name">' + esc(r.matrix.name) + '</span>' +
+      '<span class="rc-summary">' + esc(result.summary || '') + '</span>' +
+      '<span class="rc-count">' + esc(countTxt) + '</span>' +
+      '<span class="rc-chevron">&#x25BE;</span>' +
+      '</div>' +
+      '<div class="rc-body">' +
+      '<div class="tests-grid">' + testsHtml + '</div>' +
+      (provider ? '<div class="rc-provider">via ' + esc(provider) + '</div>' : '') +
+      '</div></div>';
+  }
+
+  // ── Filter ────────────────────────────────────────────────────
+  window.applyFilter = function(f) { _filter = f; updatePills(); renderFiltered(); };
+
+  function updatePills() {
+    el('filterPills').querySelectorAll('.pill').forEach(function(p) {
+      var f  = p.dataset.f;
+      var cls = f === 'all' ? 'active-all' : f === 'Pass' ? 'active-pass' :
+                f === 'Warning' ? 'active-warn' : 'active-fail';
+      p.className = 'pill' + (f === _filter ? ' ' + cls : '');
+    });
+  }
+
+  // ── UI helpers ────────────────────────────────────────────────
+  function showLanding(matrices) {
+    showCard('state');
+    el('stateError').style.display = 'none';
+    el('btnRun').style.display = matrices && matrices.length ? 'inline-flex' : 'none';
+    el('btnRun').classList.remove('loading');
+    el('btnRun').disabled = false;
+
+    var countEl = el('matrixCount');
+    var list    = el('matrixList');
+
+    if (!matrices || !matrices.length) {
+      countEl.style.display = 'none';
+      list.innerHTML = '';
+      return;
+    }
+
+    countEl.style.display = '';
+    countEl.textContent   = matrices.length + ' Eligibility Matri' +
+      (matrices.length === 1 ? 'x' : 'ces') + ' Found';
+
+    list.innerHTML = matrices.map(function(m) {
+      return '<div class="matrix-row">' +
+        '<span class="matrix-row-icon">&#x1F4C4;</span>' +
+        '<span class="matrix-row-name">' + esc(m.name) + '</span>' +
+        '</div>';
+    }).join('');
+  }
+
+  function setCredBadge() { /* removed */ }
+
+  function showCard(which) {
+    el('stateCard').style.display    = which === 'state'    ? '' : 'none';
+    el('progressCard').className     = 'progress-card' + (which === 'progress' ? ' visible' : '');
+    el('resultsArea').style.display  = which === 'results'  ? '' : 'none';
+  }
+
+  function setProgress(title, pct, sub) {
+    el('progressTitle').textContent = title;
+    el('progressFill').style.width  = pct + '%';
+    el('progressSub').textContent   = sub || '';
+  }
+
+  function showError(title, msg) {
+    showCard('state');
+    el('stateError').style.display = '';
+    el('stateCard').classList.add('error');
+    el('stateIcon').innerHTML    = '&#x26A0;&#xFE0F;';
+    el('stateTitle').textContent = title;
+    el('stateMsg').innerHTML     = msg;
+    el('btnRun').style.display   = 'none';
+    el('matrixList').innerHTML   = '';
+    el('matrixCount').style.display = 'none';
+  }
+
+  function showUsage() {
+    showCard('state');
+    el('stateError').style.display = '';
+    el('stateCard').classList.add('error');
+    el('stateIcon').innerHTML    = '&#x26A0;&#xFE0F;';
+    el('stateTitle').textContent = 'Missing Parameters';
+    el('stateMsg').innerHTML     = 'This page requires a <strong>loanId</strong> and <strong>token</strong> to be provided.';
+    el('btnRun').style.display   = 'none';
+    el('matrixList').innerHTML   = '';
+  }
+
+  function summCard(cls, val, label, sub) {
+    return '<div class="summary-card ' + cls + '">' +
+      '<div class="sc-label">' + label + '</div>' +
+      '<div class="sc-val">' + val + '</div>' +
+      '<div class="sc-sub">' + sub + '</div>' +
+      '</div>';
+  }
+
+  function checkOk(r) {
+    if (r.ok) return r;
+    return r.text().then(function(t) {
+      throw new Error('HTTP ' + r.status + (t ? ': ' + t.slice(0, 160) : ''));
+    });
+  }
+
+  function el(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+})();
+</script>
+</body>
+</html>
